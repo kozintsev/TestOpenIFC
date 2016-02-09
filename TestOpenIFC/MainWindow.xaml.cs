@@ -28,7 +28,6 @@ namespace TestOpenIFC
         private XbimModel testModel;
         private XbimModel firsModel;
         private XbimModel secondModel;
-        private XbimModel tempModel;
         // в переменную передаётся полный путь к файлу, который был открыт
         private string ifcFilename;
 
@@ -39,36 +38,41 @@ namespace TestOpenIFC
 
         private XbimModel CreateOpenFileDialog()
         {
+            XbimModel model = null;
             var dlg = new OpenFileDialog();
             dlg.Filter = "IFC Files|;*.ifc;*.ifcxml;*.ifczip"; // Filter files by extension
-            dlg.FileOk += Dlg_FileOk;
-            dlg.ShowDialog(this);
-            return tempModel;
-        }
-
-        private XbimModel GetXbimModelByFileName(string ifcFilename)
-        {
-            var model = new XbimModel();
-            try
+            dlg.FileOk += delegate (object sender, System.ComponentModel.CancelEventArgs e)
             {
-                string _temporaryXbimFileName = Path.GetTempFileName();
-                //SetOpenedModelFileName(ifcFilename);
-                model.CreateFrom(ifcFilename, _temporaryXbimFileName, null, true);
-                labelDBname.Content = model.IfcProject.Name.ToString();
-                labelGeometriesCount.Content = model.IfcProject.Phase.ToString();
-                if (model != null)
+                //var dlg = sender as OpenFileDialog;
+                if (dlg != null)
                 {
-                    lCanEdit.Content = model.CanEdit.ToString();
-                    lResult.Content = "IFC Correct.";
+                ifcFilename = dlg.FileName;
+                //tempModel = GetXbimModelByFileName(dlg.FileName);           
+                model = new XbimModel();
+                try
+                {
+                    string _temporaryXbimFileName = Path.GetTempFileName();
+                    //SetOpenedModelFileName(ifcFilename);
+                    model.CreateFrom(ifcFilename, _temporaryXbimFileName, null, true);
+                    labelDBname.Content = model.IfcProject.Name.ToString();
+                    labelGeometriesCount.Content = model.IfcProject.Phase.ToString();
+                    if (model != null)
+                    {
+                        lCanEdit.Content = model.CanEdit.ToString();
+                        lResult.Content = "IFC Correct.";
+                    }
+
+
                 }
-
-
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Ошибка" + ex.Message);
-                return null;
-            }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Ошибка" + ex.Message);
+                    model = null;
+                }
+                }
+            };
+            //Dlg_FileOk;
+            dlg.ShowDialog(this);
             return model;
         }
            
@@ -76,17 +80,6 @@ namespace TestOpenIFC
         {
             testModel = CreateOpenFileDialog();
 
-        }
-
-        private void Dlg_FileOk(object sender, System.ComponentModel.CancelEventArgs e)
-        {
-
-            var dlg = sender as OpenFileDialog;
-            if (dlg != null)
-            {
-                ifcFilename = dlg.FileName;
-                tempModel = GetXbimModelByFileName(dlg.FileName);
-          }
         }
 
         private void btnOpenIFCOne_Click(object sender, RoutedEventArgs e)
