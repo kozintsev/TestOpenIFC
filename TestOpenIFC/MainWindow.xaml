@@ -1,0 +1,24 @@
+﻿<Window x:Class="TestOpenIFC.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:TestOpenIFC"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="350" Width="525">
+    <Grid>
+        <Button x:Name="btnTest" Content="IFC Open " HorizontalAlignment="Left" Margin="432,256,0,0" VerticalAlignment="Top" Width="75" Click="btnTest_Click"/>
+        <Label x:Name="labelDBname" Content="" HorizontalAlignment="Left" Margin="169,19,0,0" VerticalAlignment="Top"/>
+        <Label x:Name="labelGeometriesCount" Content="" HorizontalAlignment="Left" Margin="169,45,0,0" VerticalAlignment="Top" RenderTransformOrigin="2.161,0.426"/>
+        <Label x:Name="label" Content="DatabaseName:" HorizontalAlignment="Left" Margin="41,19,0,0" VerticalAlignment="Top"/>
+        <Label x:Name="label1" Content="GeometriesCount:" HorizontalAlignment="Left" Margin="30,45,0,0" VerticalAlignment="Top"/>
+        <Button x:Name="btnOpenIFCOne" Content="First IFC open" HorizontalAlignment="Left" Margin="398,75,0,0" VerticalAlignment="Top" Width="109" Click="btnOpenIFCOne_Click"/>
+        <Button x:Name="btnOpenIFCTwo" Content="Second IFC open" HorizontalAlignment="Left" Margin="398,117,0,0" VerticalAlignment="Top" Width="109" Click="btnOpenIFCTwo_Click"/>
+        <Button x:Name="btnMerge" Content="Merge" HorizontalAlignment="Left" Margin="432,186,0,0" VerticalAlignment="Top" Width="75" Click="btnMerge_Click"/>
+        <Label x:Name="label2" Content="Result:" HorizontalAlignment="Left" Margin="41,160,0,0" VerticalAlignment="Top"/>
+        <Label x:Name="lResult" Content="" HorizontalAlignment="Left" Margin="97,160,0,0" VerticalAlignment="Top" RenderTransformOrigin="-0.36,-0.284" Height="100" Width="198"/>
+        <Label x:Name="label3" Content="CanEdit:" HorizontalAlignment="Left" Margin="48,273,0,0" VerticalAlignment="Top"/>
+        <Label x:Name="lCanEdit" Content="" HorizontalAlignment="Left" Margin="141,273,0,0" VerticalAlignment="Top" RenderTransformOrigin="0.541,0.408"/>
+
+    </Grid>
+</Window>
