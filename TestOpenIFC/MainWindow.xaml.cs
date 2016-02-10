@@ -36,9 +36,34 @@ namespace TestOpenIFC
             InitializeComponent();
         }
 
-        private XbimModel CreateOpenFileDialog()
+        private XbimModel GetXbimModelByFileName(string ifcFilename)
         {
-            XbimModel model = null;
+            //tempModel = GetXbimModelByFileName(dlg.FileName);           
+            var model = new XbimModel();
+            try
+            {
+                string _temporaryXbimFileName = Path.GetTempFileName();
+                //SetOpenedModelFileName(ifcFilename);
+                model.CreateFrom(ifcFilename, _temporaryXbimFileName, null, true);
+                labelDBname.Content = model.IfcProject.Name.ToString();
+                labelGeometriesCount.Content = model.IfcProject.Phase.ToString();
+                if (model != null)
+                {
+                    lCanEdit.Content = model.CanEdit.ToString();
+                    lResult.Content = "IFC Correct.";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка" + ex.Message);
+                model = null;
+            }
+            return model;
+        }
+
+        private string CreateOpenFileDialog()
+        {
+            string filename = String.Empty;
             var dlg = new OpenFileDialog();
             dlg.Filter = "IFC Files|;*.ifc;*.ifcxml;*.ifczip"; // Filter files by extension
             dlg.FileOk += delegate (object sender, System.ComponentModel.CancelEventArgs e)
@@ -46,55 +71,38 @@ namespace TestOpenIFC
                 //var dlg = sender as OpenFileDialog;
                 if (dlg != null)
                 {
-                ifcFilename = dlg.FileName;
-                //tempModel = GetXbimModelByFileName(dlg.FileName);           
-                model = new XbimModel();
-                try
-                {
-                    string _temporaryXbimFileName = Path.GetTempFileName();
-                    //SetOpenedModelFileName(ifcFilename);
-                    model.CreateFrom(ifcFilename, _temporaryXbimFileName, null, true);
-                    labelDBname.Content = model.IfcProject.Name.ToString();
-                    labelGeometriesCount.Content = model.IfcProject.Phase.ToString();
-                    if (model != null)
-                    {
-                        lCanEdit.Content = model.CanEdit.ToString();
-                        lResult.Content = "IFC Correct.";
-                    }
-
-
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Ошибка" + ex.Message);
-                    model = null;
-                }
+                    filename = dlg.FileName;          
                 }
             };
             //Dlg_FileOk;
             dlg.ShowDialog(this);
-            return model;
+            return filename;
         }
            
         private void btnTest_Click(object sender, RoutedEventArgs e)
         {
-            testModel = CreateOpenFileDialog();
+            testModel = GetXbimModelByFileName(CreateOpenFileDialog());
 
         }
 
         private void btnOpenIFCOne_Click(object sender, RoutedEventArgs e)
         {
-            firsModel = CreateOpenFileDialog();
+            firsModel = GetXbimModelByFileName(CreateOpenFileDialog());
         }
 
         private void btnOpenIFCTwo_Click(object sender, RoutedEventArgs e)
         {
-            secondModel = CreateOpenFileDialog();
+            secondModel = GetXbimModelByFileName(CreateOpenFileDialog());
         }
 
         private void btnMerge_Click(object sender, RoutedEventArgs e)
         {
 
+        }
+
+        private void btnAddFile_Click(object sender, RoutedEventArgs e)
+        {
+            fileListBox.Items.Add(CreateOpenFileDialog());
         }
     }
 }
