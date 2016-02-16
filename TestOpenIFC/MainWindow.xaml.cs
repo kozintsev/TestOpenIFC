@@ -26,6 +26,7 @@ using Xbim.Ifc2x3.TimeSeriesResource;
 using Xbim.Ifc2x3.UtilityResource;
 using Xbim.IO;
 using Xbim.XbimExtensions.Interfaces;
+using Xbim.XbimExtensions.SelectTypes;
 
 namespace TestOpenIFC
 {
@@ -167,7 +168,13 @@ namespace TestOpenIFC
             }
             return null;
         }
-
+        
+        /// <summary>
+        /// Copy building
+        /// </summary>
+        /// <param model="model"></param>
+        /// <param IfcBuilding="_building"></param>
+        /// <returns></returns>
         private IfcBuilding CopyBuilding(XbimModel model, IfcBuilding _building)
         {
             using (XbimReadWriteTransaction txn = model.BeginTransaction("Create Building"))
@@ -187,9 +194,14 @@ namespace TestOpenIFC
                 if (localPlacement != null && localPlacement.RelativePlacement == null)
                 {
 
-                    localPlacement.RelativePlacement = _localPlacement.RelativePlacement;//model.Instances.New<IfcAxis2Placement3D>();
-                    //var placement = localPlacement.RelativePlacement as IfcAxis2Placement3D;
-                    //placement.SetNewLocation(0.0, 0.0, 0.0);
+                    localPlacement.RelativePlacement = model.Instances.New<IfcAxis2Placement3D>();
+                    //IfcAxis2Placement axis = _localPlacement.RelativePlacement;
+                    var  placement = localPlacement.RelativePlacement as IfcAxis2Placement3D;
+                    var _placement = _localPlacement.RelativePlacement as IfcAxis2Placement3D;
+                    //placement.Axis = _placement.Axis;
+                    //placement.Location = _placement.Location;
+                    //placement.RefDirection = _placement.RefDirection;
+                    placement.SetNewLocation(_placement.Location.X, _placement.Location.Y, _placement.Location.Z);
                 }
 
                 model.IfcProject.AddBuilding(building);
@@ -890,23 +902,88 @@ namespace TestOpenIFC
             });
         }
 
-        private void TestAddInIFC()
+        private void TestAddInIFC(XbimModel model)
         {
-            if (firsModel != null)
+            if (model != null)
             {
-                var bildings = firsModel.IfcProducts.OfType<IfcBuilding>();
-                var buildingStories = firsModel.IfcProducts.OfType<IfcBuildingStorey>();
+                var bildings = model.IfcProducts.OfType<IfcBuilding>();
+                var buildingStories = model.IfcProducts.OfType<IfcBuildingStorey>();
                 var buildingStory = buildingStories.FirstOrDefault<IfcBuildingStorey>(); //ToList<IfcBuildingStorey>()[0];
                 var firstbilding = bildings.FirstOrDefault<IfcBuilding>();
 
-                IfcWallStandardCase wall = CreateWall(firsModel, 4000, 300, 2400);
-                if (wall != null) AddPropertiesToWall(firsModel, wall);
+                IfcWallStandardCase wall = CreateWall(model, 4000, 300, 2400);
+                if (wall != null) AddPropertiesToWall(model, wall);
                 if (buildingStory != null)
-                    AddProductInBuildingStorey(firsModel, buildingStory, wall);
+                    AddProductInBuildingStorey(model, buildingStory, wall);
                 else if (firstbilding != null)
-                    AddProduct(firsModel, firstbilding, wall);
+                    AddProduct(model, firstbilding, wall);
+                else
+                {
+                    var newbilding  = CreateBuilding(model, "Building");
+                    AddProduct(model, newbilding, wall);
+                }
                 firsModel.SaveAs("test.ifc");
             }
+        }
+
+        private IfcBuildingStorey CopyBuildingStory(XbimModel model, IfcBuildingStorey _buildingStory, IfcBuilding _building)
+        {
+            using (XbimReadWriteTransaction txn = model.BeginTransaction("Create Building Story"))
+            {
+                var buildingStory = model.Instances.New<IfcBuildingStorey>();
+                buildingStory.GlobalId = _buildingStory.GlobalId;
+                buildingStory.Name = _buildingStory.Name;
+                buildingStory.OwnerHistory.OwningUser = model.DefaultOwningUser;
+                buildingStory.OwnerHistory.OwningApplication = model.DefaultOwningApplication;
+                buildingStory.CompositionType = _buildingStory.CompositionType;
+                buildingStory.ObjectPlacement = model.Instances.New<IfcLocalPlacement>();
+
+                var localPlacement = buildingStory.ObjectPlacement as IfcLocalPlacement;
+                var _localPlacement = _buildingStory.ObjectPlacement as IfcLocalPlacement;
+
+                if (localPlacement != null && localPlacement.RelativePlacement == null)
+                {
+
+                    localPlacement.RelativePlacement = model.Instances.New<IfcAxis2Placement3D>();
+                    //IfcAxis2Placement axis = _localPlacement.RelativePlacement;
+                    var placement = localPlacement.RelativePlacement as IfcAxis2Placement3D;
+                    var _placement = _localPlacement.RelativePlacement as IfcAxis2Placement3D;
+                    //placement.Axis = _placement.Axis;
+                    //placement.Location = _placement.Location;
+                    //placement.RefDirection = _placement.RefDirection;
+                    placement.SetNewLocation(_placement.Location.X, _placement.Location.Y, _placement.Location.Z);
+                }
+
+                // не проходит валидация 
+                //buildingStory.SpatialStructuralElementParent.AddDecomposingObjectToFirstAggregation(model, _building);
+
+                //buildingStory.ReferencesElements = _building;
+                _building.AddElement(buildingStory);
+
+
+                //if (model.Validate(txn.Modified(), Console.Out) == 0)
+                //{
+                    txn.Commit();
+                    return buildingStory;
+                //}
+
+            }
+            return null;
+        }
+
+        private void TestInsertModelToNew(XbimModel newmodel, XbimModel model)
+        {
+            var buildings = model.Instances.OfType<IfcBuilding>();
+            var buildingStories = model.Instances.OfType<IfcBuildingStorey>();
+            foreach (var building in buildings)
+            {
+                var _building = CopyBuilding(newmodel, building);
+                foreach (var buildingStory in buildingStories)
+                {
+                    CopyBuildingStory(newmodel, buildingStory, _building);
+                }
+            }
+            
             
         }
 
@@ -918,27 +995,13 @@ namespace TestOpenIFC
                 // если они не совпадают то можно выполнять объединение 
                 if (firsModel.IfcProject.GlobalId != secondModel.IfcProject.GlobalId && firsModel != null && secondModel != null)
                 {
-                    //var newmodel = new XbimModel();//.XbimExtensions.XbimMemoryModel(); //create an empty model
-
-                    //using (XbimReadWriteTransaction txn = firsModel.BeginTransaction("Change Model"))
-                    //{
-                    var bildings = firsModel.IfcProducts.OfType<IfcBuilding>();
-                    var buildingStories= firsModel.IfcProducts.OfType<IfcBuildingStorey>();
-                    var buildingStory = buildingStories.FirstOrDefault<IfcBuildingStorey>(); //ToList<IfcBuildingStorey>()[0];
-                    var firstbilding = bildings.FirstOrDefault<IfcBuilding>();
-
-                    IfcWallStandardCase wall = CreateWall(firsModel, 4000, 300, 2400);
-                    if (wall != null) AddPropertiesToWall(firsModel, wall);
-                    if (buildingStory != null)
-                        AddProductInBuildingStorey(firsModel, buildingStory, wall);
-                    else if (firstbilding != null)
-                        AddProduct(firsModel, firstbilding, wall);
-                    firsModel.SaveAs("test.ifc");
-
+                    
                     var newmodel = CreateandInitModel("global_model");
-                    IfcBuilding testBilding = null;
                     if (newmodel != null)
                     {
+                        // тестирование добавление объектов существующей модели в новую
+                        TestInsertModelToNew(newmodel, firsModel);
+
                         List<IfcBuilding> listOfBuilding = new List<IfcBuilding>();
                         var listOfFirst = firsModel.IfcProducts.OfType<IfcBuilding>();
 
@@ -979,6 +1042,12 @@ namespace TestOpenIFC
         private void btnAddFile_Click(object sender, RoutedEventArgs e)
         {
             fileListBox.Items.Add(CreateOpenFileDialog());
+        }
+
+        private void btnTestAdd_Click(object sender, RoutedEventArgs e)
+        {
+            // тестирование добавление объекта стена в уже существующую модель
+            TestAddInIFC(firsModel);
         }
     }
 }
