@@ -9,7 +9,15 @@ namespace TestOpenIFC
     class TestClass
     {
     }
-
+    //
+    // Summary:
+    //     Inserts a deep copy of the toCopy object into this model All property values
+    //     are copied to the maximum depth Objects are not duplicated, if repeated copies
+    //     are to be performed use the version with the mapping argument to ensure objects
+    //     are not duplicated
+    //
+    // Parameters:
+    //   toCopy:
 
     /// <remarks/>
     [System.Xml.Serialization.XmlTypeAttribute(AnonymousType = true)]

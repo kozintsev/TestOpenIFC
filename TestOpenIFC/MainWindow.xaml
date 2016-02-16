@@ -16,12 +16,13 @@
         <Button x:Name="btnOpenIFCTwo" Content="Second IFC open" HorizontalAlignment="Left" Margin="398,117,0,0" VerticalAlignment="Top" Width="109" Click="btnOpenIFCTwo_Click"/>
         <Button x:Name="btnMerge" Content="Merge" HorizontalAlignment="Left" Margin="432,186,0,0" VerticalAlignment="Top" Width="75" Click="btnMerge_Click"/>
         <Label x:Name="label2" Content="Result:" HorizontalAlignment="Left" Margin="27,73,0,0" VerticalAlignment="Top"/>
-        <Label x:Name="lResult" Content="" HorizontalAlignment="Left" Margin="83,73,0,0" VerticalAlignment="Top" RenderTransformOrigin="-0.36,-0.284" Height="45" Width="198"/>
         <Label x:Name="label3" Content="CanEdit:" HorizontalAlignment="Left" Margin="30,142,0,0" VerticalAlignment="Top"/>
         <Label x:Name="lCanEdit" Content="" HorizontalAlignment="Left" Margin="123,142,0,0" VerticalAlignment="Top" RenderTransformOrigin="0.541,0.408"/>
         <ListBox x:Name="fileListBox" HorizontalAlignment="Left" Height="100" Margin="30,210,0,0" VerticalAlignment="Top" Width="369"/>
         <Label x:Name="label4" Content="File list:" HorizontalAlignment="Left" Margin="34,179,0,0" VerticalAlignment="Top"/>
         <Button x:Name="btnAddFile" Content="Add file" HorizontalAlignment="Left" Margin="324,186,0,0" VerticalAlignment="Top" Width="75" RenderTransformOrigin="0.638,1.843" Click="btnAddFile_Click"/>
+        <CheckBox x:Name="IsTwoProject" Content="Two project" HorizontalAlignment="Left" Margin="398,41,0,0" VerticalAlignment="Top" IsChecked="True"/>
+        <ListBox x:Name="MessagesList" HorizontalAlignment="Left" Height="58" Margin="77,81,0,0" VerticalAlignment="Top" Width="302"/>
 
     </Grid>
 </Window>
