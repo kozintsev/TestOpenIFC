@@ -987,6 +987,32 @@ namespace TestOpenIFC
             
         }
 
+        private void ChangeModel(XbimModel model, XbimModel newmodel)
+        {
+            int i = 1;
+            foreach (var o in model.Instances)
+            {
+                o.Bind(newmodel, i, true);
+                i++;
+            }
+        }
+
+        private XbimModel TestMergeModel(XbimModel newmodel, XbimModel firstmodel, XbimModel secondmodel)
+        {
+            int i = 1;
+            foreach (var o in firstmodel.Instances)
+            {
+                o.Bind(newmodel, i, true);
+                i++;
+            }
+            foreach (var o in secondmodel.Instances)
+            {
+                o.Bind(newmodel, i, true);
+                i++;
+            }
+            return newmodel;
+        }
+
         private void btnMerge_Click(object sender, RoutedEventArgs e)
         {
             if (IsTwoProject.IsChecked.Value)
@@ -999,6 +1025,8 @@ namespace TestOpenIFC
                     var newmodel = CreateandInitModel("global_model");
                     if (newmodel != null)
                     {
+                        // тестирование мержа
+                        //TestMergeModel(newmodel, firsModel, secondModel);
                         // тестирование добавление объектов существующей модели в новую
                         TestInsertModelToNew(newmodel, firsModel);
 
