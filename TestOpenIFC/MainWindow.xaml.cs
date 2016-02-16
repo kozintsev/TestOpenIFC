@@ -987,7 +987,19 @@ namespace TestOpenIFC
             
         }
 
-        private void ChangeModel(XbimModel model, XbimModel newmodel)
+        private bool FindProductByGlobalId(XbimModel model, IfcGloballyUniqueId _globalId)
+        {
+            foreach (IfcProduct p in model.IfcProducts)
+            {
+                if (p.GlobalId == _globalId)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void TestChangeModel(XbimModel model, XbimModel newmodel)
         {
             int i = 1;
             foreach (var o in model.Instances)
