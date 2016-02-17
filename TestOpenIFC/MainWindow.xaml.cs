@@ -236,7 +236,7 @@ namespace TestOpenIFC
             }
         }
 
-        private void AddProduct(XbimModel model, IfcBuilding _building, IfcProduct _prod)
+        private void AddProductInBuilding(XbimModel model, IfcBuilding _building, IfcProduct _prod)
         {
             using (XbimReadWriteTransaction txn = model.BeginTransaction("Add Product"))
             {
@@ -908,25 +908,25 @@ namespace TestOpenIFC
             {
                 var bildings = model.IfcProducts.OfType<IfcBuilding>();
                 var buildingStories = model.IfcProducts.OfType<IfcBuildingStorey>();
-                var buildingStory = buildingStories.FirstOrDefault<IfcBuildingStorey>(); //ToList<IfcBuildingStorey>()[0];
+                var buildingStorey = buildingStories.FirstOrDefault<IfcBuildingStorey>(); //ToList<IfcBuildingStorey>()[0];
                 var firstbilding = bildings.FirstOrDefault<IfcBuilding>();
 
                 IfcWallStandardCase wall = CreateWall(model, 4000, 300, 2400);
                 if (wall != null) AddPropertiesToWall(model, wall);
-                if (buildingStory != null)
-                    AddProductInBuildingStorey(model, buildingStory, wall);
+                if (buildingStorey != null)
+                    AddProductInBuildingStorey(model, buildingStorey, wall);
                 else if (firstbilding != null)
-                    AddProduct(model, firstbilding, wall);
+                    AddProductInBuilding(model, firstbilding, wall);
                 else
                 {
                     var newbilding  = CreateBuilding(model, "Building");
-                    AddProduct(model, newbilding, wall);
+                    AddProductInBuilding(model, newbilding, wall);
                 }
                 firsModel.SaveAs("test.ifc");
             }
         }
 
-        private IfcBuildingStorey CopyBuildingStory(XbimModel model, IfcBuildingStorey _buildingStory, IfcBuilding _building)
+        private IfcBuildingStorey CopyBuildingStorey(XbimModel model, IfcBuildingStorey _buildingStory, IfcBuilding _building)
         {
             using (XbimReadWriteTransaction txn = model.BeginTransaction("Create Building Story"))
             {
@@ -958,7 +958,11 @@ namespace TestOpenIFC
                 //buildingStory.SpatialStructuralElementParent.AddDecomposingObjectToFirstAggregation(model, _building);
 
                 //buildingStory.ReferencesElements = _building;
-                _building.AddElement(buildingStory);
+                
+                var ifcRel = model.Instances.New<IfcRelAggregates>();
+                ifcRel.RelatingObject = _building;//.RelatingMaterial = material;
+                ifcRel.RelatedObjects.Add(buildingStory);
+                //_building.AddElement(buildingStory);
 
 
                 //if (model.Validate(txn.Modified(), Console.Out) == 0)
@@ -971,16 +975,30 @@ namespace TestOpenIFC
             return null;
         }
 
+        private IfcProduct CopyProduct(XbimModel model, IfcBuildingStorey _buildingStorey, IfcProduct _prod)
+        {
+            
+            return null;
+        }
+
         private void TestInsertModelToNew(XbimModel newmodel, XbimModel model)
         {
             var buildings = model.Instances.OfType<IfcBuilding>();
             var buildingStories = model.Instances.OfType<IfcBuildingStorey>();
+            var products = model.Instances.OfType<IfcProduct>().Where<IfcProduct>(
+                p => p.GetType() != typeof(IfcBuilding) && p.GetType() != typeof(IfcBuildingStorey)); 
             foreach (var building in buildings)
             {
                 var _building = CopyBuilding(newmodel, building);
                 foreach (var buildingStory in buildingStories)
                 {
-                    CopyBuildingStory(newmodel, buildingStory, _building);
+                    var _buildingStorey = CopyBuildingStorey(newmodel, buildingStory, _building);
+                    foreach (var product in products)
+                    {
+                        var copyproduct = CopyProduct(newmodel, buildingStory, product);
+                        if (copyproduct != null)
+                            AddProductInBuildingStorey(newmodel, _buildingStorey, copyproduct);
+                    }
                 }
             }
             
