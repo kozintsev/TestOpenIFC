@@ -953,23 +953,17 @@ namespace TestOpenIFC
                     //placement.RefDirection = _placement.RefDirection;
                     placement.SetNewLocation(_placement.Location.X, _placement.Location.Y, _placement.Location.Z);
                 }
-
-                // не проходит валидация 
-                //buildingStory.SpatialStructuralElementParent.AddDecomposingObjectToFirstAggregation(model, _building);
-
-                //buildingStory.ReferencesElements = _building;
                 
                 var ifcRel = model.Instances.New<IfcRelAggregates>();
                 ifcRel.RelatingObject = _building;//.RelatingMaterial = material;
                 ifcRel.RelatedObjects.Add(buildingStory);
                 //_building.AddElement(buildingStory);
 
-
-                //if (model.Validate(txn.Modified(), Console.Out) == 0)
-                //{
+                if (model.Validate(txn.Modified(), Console.Out) == 0)
+                {
                     txn.Commit();
                     return buildingStory;
-                //}
+                }
 
             }
             return null;
@@ -977,20 +971,28 @@ namespace TestOpenIFC
 
         private IfcProduct CopyProduct(XbimModel model, IfcBuildingStorey _buildingStorey, IfcProduct _prod)
         {
-            
-            return null;
+            using (XbimReadWriteTransaction txn = model.BeginTransaction("Create Building Story"))
+            {
+                var ifcRel = model.Instances.New<IfcRelAggregates>();
+                ifcRel.RelatingObject = _buildingStorey;
+                ifcRel.RelatedObjects.Add(_prod);
+
+                txn.Commit();
+                return _prod;
+            }
+            //return null;
         }
 
         private void TestInsertModelToNew(XbimModel newmodel, XbimModel model)
         {
             var buildings = model.Instances.OfType<IfcBuilding>();
-            var buildingStories = model.Instances.OfType<IfcBuildingStorey>();
+            var buildingStorys = model.Instances.OfType<IfcBuildingStorey>();
             var products = model.Instances.OfType<IfcProduct>().Where<IfcProduct>(
                 p => p.GetType() != typeof(IfcBuilding) && p.GetType() != typeof(IfcBuildingStorey)); 
             foreach (var building in buildings)
             {
                 var _building = CopyBuilding(newmodel, building);
-                foreach (var buildingStory in buildingStories)
+                foreach (var buildingStory in buildingStorys)
                 {
                     var _buildingStorey = CopyBuildingStorey(newmodel, buildingStory, _building);
                     foreach (var product in products)
