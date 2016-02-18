@@ -1,6 +1,7 @@
 ﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -40,7 +41,7 @@ namespace TestOpenIFC
         private XbimModel firsModel;
         private XbimModel secondModel;
         // в переменную передаётся полный путь к файлу, который был открыт
-        //private string ifcFilename;
+        private string ifcFilename;
 
         public MainWindow()
         {
@@ -53,15 +54,16 @@ namespace TestOpenIFC
         }
             
 
-        private XbimModel GetXbimModelByFileName(string ifcFilename)
+        private XbimModel GetXbimModelByFileName(string ifcFilename, string XbimFileName)
         {
             //tempModel = GetXbimModelByFileName(dlg.FileName);           
             var model = new XbimModel();
             try
             {
-                string _temporaryXbimFileName = Path.GetTempFileName();
+                if (String.IsNullOrEmpty(XbimFileName))
+                    XbimFileName = Path.GetTempFileName();
                 //SetOpenedModelFileName(ifcFilename);
-                model.CreateFrom(ifcFilename, _temporaryXbimFileName, null, true);
+                model.CreateFrom(ifcFilename, XbimFileName, null, true);
                 labelDBname.Content = model.IfcProject.Name.ToString();
                 labelGeometriesCount.Content = model.IfcProject.Phase.ToString();
                 if (model != null)
@@ -97,18 +99,19 @@ namespace TestOpenIFC
            
         private void btnTest_Click(object sender, RoutedEventArgs e)
         {
-            testModel = GetXbimModelByFileName(CreateOpenFileDialog());
-
+            testModel = GetXbimModelByFileName(CreateOpenFileDialog(), null);
         }
 
         private void btnOpenIFCOne_Click(object sender, RoutedEventArgs e)
         {
-            firsModel = GetXbimModelByFileName(CreateOpenFileDialog());
+            ifcFilename = CreateOpenFileDialog();
+            firsModel = GetXbimModelByFileName(ifcFilename, Path.GetFileNameWithoutExtension(ifcFilename) + ".xBIM");
         }
 
         private void btnOpenIFCTwo_Click(object sender, RoutedEventArgs e)
         {
-            secondModel = GetXbimModelByFileName(CreateOpenFileDialog());
+            ifcFilename = CreateOpenFileDialog();
+            secondModel = GetXbimModelByFileName(ifcFilename, Path.GetFileNameWithoutExtension(ifcFilename) + ".xBIM");
         }
 
 
@@ -228,9 +231,10 @@ namespace TestOpenIFC
                     _buildingStorey.AddElement(_prod);
                     txn.Commit();
                 }
-                catch
+                catch(Exception ex)
                 {
-                    //MessageBox.Show(_prod.GetType().Name);
+                    AddMessages("Error in AddProductInBuildingStorey: " + ex.Message);
+                    Debug.WriteLine("Error in AddProductInBuildingStorey: " + ex.Message);
                 }
 
             }
@@ -969,16 +973,34 @@ namespace TestOpenIFC
             return null;
         }
 
-        private IfcProduct CopyProduct(XbimModel model, IfcBuildingStorey _buildingStorey, IfcProduct _prod)
+        private IfcProduct CopyProduct(XbimModel model, IfcProduct _prod)
         {
-            using (XbimReadWriteTransaction txn = model.BeginTransaction("Create Building Story"))
+            using (XbimReadWriteTransaction txn = model.BeginTransaction())
             {
-                var ifcRel = model.Instances.New<IfcRelAggregates>();
-                ifcRel.RelatingObject = _buildingStorey;
-                ifcRel.RelatedObjects.Add(_prod);
+                IPersistIfcEntity ent = _prod as IPersistIfcEntity;
+                //BinaryReader br = new BinaryReader(new MemoryStream());//
+                
+                //_prod.ReadEntityProperties(null, br);
+                ent.Bind(model, ent.EntityLabel, ent.Activated);
+                IfcProduct prod = ent as IfcProduct;
+                try
+                {
+                    IfcProduct newprod = model.Instances.New(_prod.GetType()) as IfcProduct;
+                    newprod = prod;
+                }
+                catch(Exception ex)
+                {
+                    AddMessages("CopyProduct exception: " + ex.Message);
+                    Debug.WriteLine("CopyProduct exception: " + ex.Message);
+                }
+                
+
+                //var ifcRel = model.Instances.New<IfcRelAggregates>();
+                //ifcRel.RelatingObject = _buildingStorey;
+                //ifcRel.RelatedObjects.Add(prod);
 
                 txn.Commit();
-                return _prod;
+                return prod;
             }
             //return null;
         }
@@ -997,9 +1019,11 @@ namespace TestOpenIFC
                     var _buildingStorey = CopyBuildingStorey(newmodel, buildingStory, _building);
                     foreach (var product in products)
                     {
-                        var copyproduct = CopyProduct(newmodel, buildingStory, product);
+                        var copyproduct = CopyProduct(newmodel, product);
                         if (copyproduct != null)
+                        {
                             AddProductInBuildingStorey(newmodel, _buildingStorey, copyproduct);
+                        }
                     }
                 }
             }
@@ -1060,6 +1084,7 @@ namespace TestOpenIFC
                         // тестирование мержа
                         //TestMergeModel(newmodel, firsModel, secondModel);
                         // тестирование добавление объектов существующей модели в новую
+                        XbimModelSummary sum = new XbimModelSummary(newmodel);
                         TestInsertModelToNew(newmodel, firsModel);
 
                         List<IfcBuilding> listOfBuilding = new List<IfcBuilding>();
@@ -1094,7 +1119,8 @@ namespace TestOpenIFC
                     }
                     else
                     {
-                        Console.WriteLine("Failed to initialise the model");
+                        AddMessages("Failed to initialise the model");
+                        Debug.WriteLine("Failed to initialise the model");
                     }
                 }            
         }
@@ -1108,6 +1134,32 @@ namespace TestOpenIFC
         {
             // тестирование добавление объекта стена в уже существующую модель
             TestAddInIFC(firsModel);
+        }
+
+        private void btnAddsRefModel_Click(object sender, RoutedEventArgs e)
+        {
+            if (firsModel.IfcProject.GlobalId != secondModel.IfcProject.GlobalId && firsModel != null && secondModel != null)
+            {
+
+                var newmodel = CreateandInitModel("global_model");
+                if (newmodel != null)
+                {
+                    newmodel.AddModelReference(firsModel.DatabaseName, "ASCON", "Developer");
+                    newmodel.AddModelReference(secondModel.DatabaseName, "ASCON", "Developer");
+                    try
+                    {
+                        //Console.WriteLine("Standard Wall successfully created....");
+                        //write the Ifc File
+                        if (File.Exists("global_model.ifc"))
+                            File.Delete("global_model.ifc");
+                        newmodel.SaveAs("global_model.ifc", XbimStorageType.IFC);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Failed to save global_model.ifc" + ex.Message);
+                    }
+                }
+            }
         }
     }
 }

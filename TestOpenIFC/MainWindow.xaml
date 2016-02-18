@@ -7,7 +7,7 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="350" Width="525">
     <Grid>
-        <Button x:Name="btnTest" Content="IFC Open " HorizontalAlignment="Left" Margin="432,256,0,0" VerticalAlignment="Top" Width="75" Click="btnTest_Click"/>
+        <Button x:Name="btnTest" Content="IFC Open " HorizontalAlignment="Left" Margin="432,240,0,0" VerticalAlignment="Top" Width="75" Click="btnTest_Click"/>
         <Label x:Name="labelDBname" Content="" HorizontalAlignment="Left" Margin="154,15,0,0" VerticalAlignment="Top"/>
         <Label x:Name="labelGeometriesCount" Content="" HorizontalAlignment="Left" Margin="154,41,0,0" VerticalAlignment="Top" RenderTransformOrigin="2.161,0.426"/>
         <Label x:Name="label" Content="DatabaseName:" HorizontalAlignment="Left" Margin="26,15,0,0" VerticalAlignment="Top"/>
@@ -24,6 +24,7 @@
         <CheckBox x:Name="IsTwoProject" Content="Two project" HorizontalAlignment="Left" Margin="398,41,0,0" VerticalAlignment="Top" IsChecked="True"/>
         <ListBox x:Name="MessagesList" HorizontalAlignment="Left" Height="58" Margin="77,81,0,0" VerticalAlignment="Top" Width="302"/>
         <Button x:Name="btnTestAdd" Content="Add in IFC" HorizontalAlignment="Left" Margin="432,213,0,0" VerticalAlignment="Top" Width="75" Click="btnTestAdd_Click"/>
+        <Button x:Name="btnAddsRefModel" Content="Add Ref Model" HorizontalAlignment="Left" Margin="432,267,0,0" VerticalAlignment="Top" Width="75" Click="btnAddsRefModel_Click"/>
 
     </Grid>
 </Window>
