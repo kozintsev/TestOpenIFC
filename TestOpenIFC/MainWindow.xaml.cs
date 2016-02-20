@@ -52,8 +52,13 @@ namespace TestOpenIFC
         {
             MessagesList.Items.Add(messages);
         }
-            
 
+        /// <summary>
+        /// Получить модель ifc файла по имени файла 
+        /// </summary>
+        /// <param name="ifcFilename">Имя файла</param>
+        /// <param name="XbimFileName">Имя файла базы данных, если null то генерируется временный файл</param>
+        /// <returns></returns>
         private XbimModel GetXbimModelByFileName(string ifcFilename, string XbimFileName)
         {
             //tempModel = GetXbimModelByFileName(dlg.FileName);           
@@ -223,19 +228,25 @@ namespace TestOpenIFC
 
         private void AddProductInBuildingStorey(XbimModel model, IfcBuildingStorey _buildingStorey, IfcProduct _prod)
         {
-            using (XbimReadWriteTransaction txn = model.BeginTransaction())
+            if (model.IsTransacting)
+                return;
+            using (XbimReadWriteTransaction txn = model.BeginTransaction("AddProductToBuildingStorey"))
             {
                 //if (_prod is IfcSpatialStructureElement)
                 try
                 {
                     _buildingStorey.AddElement(_prod);
-                    txn.Commit();
+                    if (model.Validate(txn.Modified(), Console.Out) == 0)
+                    {
+                        txn.Commit();
+                    }
                 }
                 catch(Exception ex)
                 {
                     AddMessages("Error in AddProductInBuildingStorey: " + ex.Message);
                     Debug.WriteLine("Error in AddProductInBuildingStorey: " + ex.Message);
                 }
+
 
             }
         }
@@ -972,57 +983,188 @@ namespace TestOpenIFC
             }
             return null;
         }
-
-        private IfcProduct CopyProduct(XbimModel model, IfcProduct _prod)
+        private void CopyInstances(XbimModel newmodel, XbimModel model)
         {
-            using (XbimReadWriteTransaction txn = model.BeginTransaction())
+            newmodel.AutoAddOwnerHistory = false;
+            using (XbimReadWriteTransaction txn = newmodel.BeginTransaction("CopyInstances"))
             {
-                IPersistIfcEntity ent = _prod as IPersistIfcEntity;
-                //BinaryReader br = new BinaryReader(new MemoryStream());//
-                
-                //_prod.ReadEntityProperties(null, br);
-                ent.Bind(model, ent.EntityLabel, ent.Activated);
-                IfcProduct prod = ent as IfcProduct;
+                PropertyTranformDelegate propTransform = delegate (IfcMetaProperty prop, object toCopy)
+                {
+                    var value = prop.PropertyInfo.GetValue(toCopy, null);
+                    return value;
+                };
+
+                var copied = new XbimInstanceHandleMap(model, newmodel);
+
+                foreach (var ent in model.Instances)
+                {
+                    newmodel.InsertCopy(ent, copied, txn, propTransform);
+                }
+                    
+                if (model.Validate(txn.Modified(), Console.Out) == 0)
+                {
+                    txn.Commit();
+                }
+            }
+        }
+        private void CopyInstance(XbimModel newmodel, XbimModel model, IPersistIfcEntity ent)
+        {
+            newmodel.AutoAddOwnerHistory = false;
+            using (XbimReadWriteTransaction txn = newmodel.BeginTransaction("CopyInstance"))
+            {
+                PropertyTranformDelegate propTransform = delegate (IfcMetaProperty prop, object toCopy)
+                {
+                    var value = prop.PropertyInfo.GetValue(toCopy, null);
+                    return value;
+                };
+
+                var copied = new XbimInstanceHandleMap(model, newmodel);
+
                 try
                 {
-                    IfcProduct newprod = model.Instances.New(_prod.GetType()) as IfcProduct;
-                    newprod = prod;
+                    newmodel.InsertCopy(ent, copied, txn, propTransform);
                 }
                 catch(Exception ex)
                 {
-                    AddMessages("CopyProduct exception: " + ex.Message);
-                    Debug.WriteLine("CopyProduct exception: " + ex.Message);
+                    AddMessages(" " + ex.Message);
+                    Debug.WriteLine(" " + ex.Message);
                 }
-                
 
-                //var ifcRel = model.Instances.New<IfcRelAggregates>();
-                //ifcRel.RelatingObject = _buildingStorey;
-                //ifcRel.RelatedObjects.Add(prod);
-
-                txn.Commit();
-                return prod;
+                if (model.Validate(txn.Modified(), Console.Out) == 0)
+                {
+                    txn.Commit();
+                }
             }
-            //return null;
+        }
+        private IfcProduct CopyProduct(XbimModel newmodel, XbimModel model, IfcProduct _prod)
+        {
+            using (XbimReadWriteTransaction txn = newmodel.BeginTransaction("CopyProduct"))
+            {
+                PropertyTranformDelegate propTransform = delegate (IfcMetaProperty prop, object toCopy)
+                {
+                    var value = prop.PropertyInfo.GetValue(toCopy, null);
+                    return value;
+                };
+
+                var copied = new XbimInstanceHandleMap(model, newmodel);
+                IPersistIfcEntity ent = _prod as IPersistIfcEntity;
+                XbimInstanceHandle toCopyHandle = ent.GetHandle();
+                XbimInstanceHandle copyHandle;
+                if (copied.TryGetValue(toCopyHandle, out copyHandle))
+                {
+                    //Debug.Assert(copyHandle != null);
+                    txn.Commit();
+                    return copyHandle.GetEntity() as IfcProduct;
+                }
+                txn.Pulse();
+                IfcType ifcType = IfcMetaData.IfcType(ent);
+                //int copyLabel = ent.EntityLabel;
+                var _ent = newmodel.Instances.New(ifcType.Type);
+                copyHandle = _ent.GetHandle();//InsertNew(ifcType.Type, copyLabel);
+                copied.Add(toCopyHandle, copyHandle);
+                if (typeof(IfcCartesianPoint) == ifcType.Type || typeof(IfcDirection) == ifcType.Type)//special cases for cartesian point and direction for efficiency
+                {
+                    IPersistIfcEntity v = (IPersistIfcEntity)Activator.CreateInstance(ifcType.Type, new object[] { ent });
+                    v.Bind(newmodel, copyHandle.EntityLabel, true);
+                    v.Activate(true);
+                    txn.Commit();
+                    return copyHandle.GetEntity() as IfcProduct;
+                    //read.TryAdd(copyHandle.EntityLabel, v);
+                    //createdNew.TryAdd(copyHandle.EntityLabel, v);
+                    //return (T)v;
+                }
+                else
+                {
+                    IPersistIfcEntity theCopy = (IPersistIfcEntity)Activator.CreateInstance(copyHandle.EntityType);
+                    theCopy.Bind(newmodel, copyHandle.EntityLabel, true);
+                    //read.TryAdd(copyHandle.EntityLabel, theCopy);
+                    //createdNew.TryAdd(copyHandle.EntityLabel, theCopy);
+                    // IfcRoot rt = theCopy as IfcRoot;
+                    IEnumerable<IfcMetaProperty> props = ifcType.IfcProperties.Values.Where(p => !p.IfcAttribute.IsDerivedOverride);
+                    // if (rt != null) rt.OwnerHistory = _model.OwnerHistoryAddObject;
+                    foreach (IfcMetaProperty prop in props)
+                    {
+                        //if (rt != null && prop.PropertyInfo.Name == "OwnerHistory") //don't add the owner history in as this will be changed later
+                        //    continue;
+                        object value;
+                        if (propTransform != null)
+                            value = propTransform(prop, ent);
+                        else
+                            value = prop.PropertyInfo.GetValue(ent, null);
+                        if (value != null)
+                        {
+                            Type theType = value.GetType();
+                            //if it is an express type or a value type, set the value
+                            if (theType.IsValueType || typeof(ExpressType).IsAssignableFrom(theType))
+                            {
+                                prop.PropertyInfo.SetValue(theCopy, value, null);
+                            }
+                          
+                        }
+                    }
+                    //  if (rt != null) rt.OwnerHistory = this.OwnerHistoryAddObject;
+                    _prod = theCopy as IfcProduct;
+                }
+
+                if (newmodel.Validate(txn.Modified(), Console.Out) == 0)
+                {
+                    txn.Commit();
+                    return _prod;
+                }
+            }
+            return null;
+        }
+
+        private void ChangeRelProducts(XbimModel model, IfcBuildingStorey bs, IfcProduct _product)
+        {
+            //var products = model.Instances.OfType<IfcBuildingElement>();
+            using (XbimReadWriteTransaction txn = model.BeginTransaction("ChangeRelProducts"))
+            {
+                var ifcRel = model.Instances.New<IfcRelContainedInSpatialStructure>();
+                ifcRel.RelatingStructure = bs;
+                ifcRel.RelatedElements.Add(_product);
+                if (model.Validate(txn.Modified(), Console.Out) == 0)
+                {
+                    txn.Commit();
+                }
+            }
         }
 
         private void TestInsertModelToNew(XbimModel newmodel, XbimModel model)
         {
             var buildings = model.Instances.OfType<IfcBuilding>();
             var buildingStorys = model.Instances.OfType<IfcBuildingStorey>();
-            var products = model.Instances.OfType<IfcProduct>().Where<IfcProduct>(
-                p => p.GetType() != typeof(IfcBuilding) && p.GetType() != typeof(IfcBuildingStorey)); 
+            //var products = model.Instances.OfType<IfcProduct>().Where<IfcProduct>(
+            //    p => p.GetType() != typeof(IfcBuilding) && p.GetType() != typeof(IfcBuildingStorey)); 
+            var products = model.Instances.OfType<IfcBuildingElement>();
             foreach (var building in buildings)
             {
                 var _building = CopyBuilding(newmodel, building);
+                if (buildingStorys.Count() == 0)
+                {
+                    foreach (var product in products)
+                    {
+                        var copyproduct = CopyProduct(newmodel, model, product);
+                        AddProductInBuilding(newmodel, _building, copyproduct);
+                    }
+                }
                 foreach (var buildingStory in buildingStorys)
                 {
                     var _buildingStorey = CopyBuildingStorey(newmodel, buildingStory, _building);
                     foreach (var product in products)
                     {
-                        var copyproduct = CopyProduct(newmodel, product);
+                        //ChangeRelProducts(newmodel, _buildingStorey, product);
+                        var copyproduct = CopyProduct(newmodel, model, product);
                         if (copyproduct != null)
                         {
-                            AddProductInBuildingStorey(newmodel, _buildingStorey, copyproduct);
+                            try
+                            {
+                                AddProductInBuildingStorey(newmodel, _buildingStorey, copyproduct);
+                            }
+                            catch
+                            {
+                                AddMessages("AddProductInBuildingStorey exception");
+                            }
                         }
                     }
                 }
@@ -1077,39 +1219,23 @@ namespace TestOpenIFC
                 // если они не совпадают то можно выполнять объединение 
                 if (firsModel.IfcProject.GlobalId != secondModel.IfcProject.GlobalId && firsModel != null && secondModel != null)
                 {
-                    
+
                     var newmodel = CreateandInitModel("global_model");
                     if (newmodel != null)
                     {
                         // тестирование мержа
                         //TestMergeModel(newmodel, firsModel, secondModel);
                         // тестирование добавление объектов существующей модели в новую
-                        XbimModelSummary sum = new XbimModelSummary(newmodel);
                         TestInsertModelToNew(newmodel, firsModel);
-
-                        List<IfcBuilding> listOfBuilding = new List<IfcBuilding>();
-                        var listOfFirst = firsModel.IfcProducts.OfType<IfcBuilding>();
-
-                            foreach (IfcBuilding b in listOfFirst)
-                            {
-
-                            }
-
-                            foreach (IfcBuilding b2 in listOfBuilding)
-                            {
-
-                            
-                            }
-
-                            }
+                        //CopyInstances(newmodel, firsModel);
+                        //List<IfcBuilding> listOfBuilding = new List<IfcBuilding>();
+                        //var listOfFirst = firsModel.IfcProducts.OfType<IfcBuilding>();
                         try
                         {
-                            //Console.WriteLine("Standard Wall successfully created....");
                             //write the Ifc File
                             if (File.Exists("global_model.ifc"))
                                 File.Delete("global_model.ifc");
                             newmodel.SaveAs("global_model.ifc", XbimStorageType.IFC);
-                            //Console.WriteLine("HelloWall.ifc has been successfully written");
                         }
                         catch (Exception ex)
                         {
@@ -1122,7 +1248,8 @@ namespace TestOpenIFC
                         AddMessages("Failed to initialise the model");
                         Debug.WriteLine("Failed to initialise the model");
                     }
-                }            
+                }
+            }           
         }
 
         private void btnAddFile_Click(object sender, RoutedEventArgs e)
